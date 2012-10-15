@@ -5,10 +5,12 @@ import _geohash
 from django.db import models
 from django.conf import settings
 from django.core.cache import cache
+from django.utils.datastructures import SortedDict
 
-import cartoyoin.lib as cartoyoin
+import django_cartodb.lib as cartodb
 
-CACHE_DURATION = getattr(settings, 'CARTOYOIN_CACHE_DURATION', 120 * 60)
+
+CACHE_DURATION = getattr(settings, 'CARTODB_CACHE_DURATION', 120 * 60)
 
 
 class CartoQuerySet(models.query.QuerySet):
@@ -49,8 +51,8 @@ class CartoQuerySet(models.query.QuerySet):
                     setattr(
                         obj,
                         'distance',
-                        '%.3f' % self._cartodb_result_cache[obj.id].get(
-                            'distance', 0))
+                        float('%.3f' % self._cartodb_result_cache[obj.id].get(
+                            'distance', 0)))
                 else:
                     setattr(obj, 'distance', 0)
             # Use cache.add instead of cache.set to prevent race conditions
@@ -64,50 +66,42 @@ class CartoQuerySet(models.query.QuerySet):
             Search in cartodb the ids and add a
             filter "pk__in=[]" to current queryset.
 
-            Raises NotImplementedError if model is not synced with cartodb
+            Raises error if model is not synced with cartodb
+
+            To use joins, the filter must have this syntax:
+                tableJOIN__fieldJOIN__pkJOIN
+
+                with:
+                    tableJOIN as the external table name.
+                    fieldJOIN the field for filtering.
+                    pkJOIN primary key field in external table to match JOIN.
         """
         assert 'lat' in kwargs
         assert 'lon' in kwargs
+        assert hasattr(self.model, '_cartodb_table')
 
-        if self.model == models.get_model('venues', 'Venue'):
-            carto_table = settings.CARTODB_VENUES
-        elif self.model == models.get_model('venues', 'VenueCheckIn'):
-            carto_table = settings.CARTODB_CHECKINS
-        else:
-            raise NotImplementedError('Unknown model type')
+        cartodb_table = self.model._cartodb_table
 
-        """
-            We do a little trick here, generate a small square around the point
-            with geohash and store it in cache, so we avoid repeating very
-            close queries to cartodb
-        """
-        key = self._get_cache_key(kwargs['lat'], kwargs['lon'])
+        key = self._get_cache_key(**kwargs)
         self._cartodb_result_cache = cache.get(key)
-        if self._cartodb_result_cache:
-            return self._filter_or_exclude(
-                negate=False,
-                pk__in=self._cartodb_result_cache.keys())
-
-        if 'distance' in kwargs:
-            if kwargs['distance'] > 10000:
-                kwargs['distance'] = 10000
-            results = cartoyoin.get_in_distance(
-                carto_table,
-                **kwargs)
-        else:
-            results = cartoyoin.get_nearest(
-                carto_table,
-                **kwargs)
-
-        if not results:
-            return self.none()
-
-        # store cartodb response in cache to avoid more queries
-        self._cartodb_result_cache = {
-            row['cartodb_id']: row for row in results}
-
-        # ADD prevent race conditions
-        cache.add(key, self._cartodb_result_cache, CACHE_DURATION)
+        if not self._cartodb_result_cache:
+            if 'distance' in kwargs:
+                if kwargs['distance'] > 10000:
+                    kwargs['distance'] = 10000
+                results = cartodb.get_in_distance(
+                    cartodb_table,
+                    **kwargs)
+            else:
+                results = cartodb.get_nearest(
+                    cartodb_table,
+                    **kwargs)
+            if not results:
+                return self.none()
+            # store cartodb response in cache to avoid more queries
+            self._cartodb_result_cache = SortedDict([
+                (row['cartodb_id'], row) for row in results])
+            # ADD prevent race conditions
+            cache.add(key, self._cartodb_result_cache, CACHE_DURATION)
 
         return self._filter_or_exclude(
             negate=False,
@@ -125,12 +119,16 @@ class CartoQuerySet(models.query.QuerySet):
         c._cartodb_result_cache = self._cartodb_result_cache
         return c
 
-    def _get_cache_key(self, lat, lon):
+    def _get_cache_key(self, **kwargs):
         """
             Generates a valid cache key with a geohash.
             the geohash square is approximately 20 m
         """
-        return 'cartodb_%s' % _geohash.encode(lat, lon)[:8]
+        key = 'cartodb_%s_' % _geohash.encode(
+            kwargs.pop('lat'), kwargs.pop('lon'))[:8]
+        key += '_'.join([
+            '%s=%s' % (k, kwargs[k]) for k in sorted(kwargs.iterkeys())])
+        return key
 
 
 class CartoManager(models.Manager):
