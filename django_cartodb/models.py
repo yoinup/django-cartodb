@@ -7,7 +7,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.utils.datastructures import SortedDict
 
-import django_cartodb.lib as cartodb
+import lib as cartodb
 
 
 CACHE_DURATION = getattr(settings, 'CARTODB_CACHE_DURATION', 120 * 60)
