@@ -18,8 +18,8 @@ def get_nearest(table_name, lat, lon, limit=20, offset=0, **kwargs):
     join_sql = _build_joins(table_name, **kwargs)
 
     sql = u"""
-                SELECT cartodb_id,
-                    ST_Distance(the_geom::geography,
+                SELECT %(tablename)s.cartodb_id,
+                    ST_Distance(%(tablename)s.the_geom::geography,
                         ST_SetSRID(ST_Point(%(lon)s,%(lat)s),
                          4326)::geography) AS distance
                 FROM %(tablename)s
@@ -108,6 +108,15 @@ def delete_row(table_name, pk):
         'tablename': table_name,
         'pk': pk,
     })
+
+    return result
+
+
+def delete_all(table_name):
+    result = cl.sql(u"""
+                DELETE FROM %(tablename)s
+                """ % {
+        'tablename': table_name})
 
     return result
 

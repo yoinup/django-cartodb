@@ -83,7 +83,10 @@ class CartoQuerySet(models.query.QuerySet):
         cartodb_table = self.model._cartodb_table
 
         key = self._get_cache_key(**kwargs)
-        self._cartodb_result_cache = cache.get(key)
+        if settings.DEBUG:
+            self._cartodb_result_cache = None
+        else:
+            self._cartodb_result_cache = cache.get(key)
         if not self._cartodb_result_cache:
             if 'distance' in kwargs:
                 if kwargs['distance'] > 10000:
