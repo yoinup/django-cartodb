@@ -7,7 +7,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.utils.datastructures import SortedDict
 
-import django_cartodb.lib as cartodb
+import lib as cartodb
 
 
 CACHE_DURATION = getattr(settings, 'CARTODB_CACHE_DURATION', 120 * 60)
@@ -83,7 +83,10 @@ class CartoQuerySet(models.query.QuerySet):
         cartodb_table = self.model._cartodb_table
 
         key = self._get_cache_key(**kwargs)
-        self._cartodb_result_cache = cache.get(key)
+        if settings.DEBUG:
+            self._cartodb_result_cache = None
+        else:
+            self._cartodb_result_cache = cache.get(key)
         if not self._cartodb_result_cache:
             if 'distance' in kwargs:
                 if kwargs['distance'] > 10000:
