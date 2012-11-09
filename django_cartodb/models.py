@@ -33,8 +33,6 @@ class CartoQuerySet(models.query.QuerySet):
             In filter_cartodb, we need to use params limit and offset, maybe
             we can change that to use retrieve item or slice:
                 Venue.objects.filter_cartodb(lat,lon)[2:15]
-
-            Use Cache to store cartodb results and avoid duplicate queries
     """
 
     def __init__(self, *args, **kwargs):
@@ -168,3 +166,6 @@ class CartoManager(models.Manager):
 
     def filter_cartodb(self, **kwargs):
         return self.get_query_set().filter_cartodb(**kwargs)
+
+    def custom_sql(self, sql):
+        return cartodb.custom_sql(sql)

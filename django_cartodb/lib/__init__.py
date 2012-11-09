@@ -11,6 +11,15 @@ cl = CartoDBAPIKey(
     settings.CARTODB_DOMAIN)
 
 
+def custom_sql(sql):
+    """
+        Query cartodb to get ID ordered by distance to the point
+    """
+    result = cl.sql(sql)
+    objects = result['rows']
+    return objects
+
+
 def get_nearest(table_name, lat, lon, limit=20, offset=0, **kwargs):
     """
         Query cartodb to get ID ordered by distance to the point
@@ -19,13 +28,14 @@ def get_nearest(table_name, lat, lon, limit=20, offset=0, **kwargs):
 
     sql = u"""
                 SELECT %(tablename)s.cartodb_id,
-                    ST_Distance(%(tablename)s.the_geom::geography,
+                    ST_Distance(%(tablename)s.the_geom::geometry,
                         ST_SetSRID(ST_Point(%(lon)s,%(lat)s),
                          4326)::geography) AS distance
                 FROM %(tablename)s
                 %(joins)s
-                ORDER BY distance
-                ASC LIMIT %(limit)s OFFSET %(offset)s
+                ORDER BY %(tablename)s.the_geom <-> ST_SetSRID(ST_Point(
+                    %(lon)s,%(lat)s), 4326)::geometry ASC
+                LIMIT %(limit)s OFFSET %(offset)s
                 """ % {
         'tablename': table_name,
         'lat': '%.6f' % lat,
@@ -35,6 +45,7 @@ def get_nearest(table_name, lat, lon, limit=20, offset=0, **kwargs):
         'joins': join_sql,
     }
     result = cl.sql(sql)
+
     objects = result['rows']
     return objects
 
@@ -50,7 +61,7 @@ def get_in_distance(
 
     result = cl.sql(u"""
                 SELECT %(tablename)s.cartodb_id,
-                    ST_Distance(%(tablename)s.the_geom::geography,
+                    ST_Distance(%(tablename)s.the_geom::geometry,
                         ST_SetSRID(ST_Point(%(lon)s,%(lat)s),
                          4326)::geography) AS distance
                 FROM %(tablename)s
@@ -58,7 +69,9 @@ def get_in_distance(
                 WHERE ST_DWithin(%(tablename)s.the_geom,
                     ST_SetSRID(ST_Point(%(lon)s,%(lat)s), 4326)::geography,
                     %(distance)s)
-                ORDER BY distance ASC LIMIT %(limit)s OFFSET %(offset)s
+                ORDER BY %(tablename)s.the_geom <-> ST_SetSRID(ST_Point(
+                    %(lon)s,%(lat)s), 4326)::geometry ASC
+                LIMIT %(limit)s OFFSET %(offset)s
                 """ % {
         'tablename': table_name,
         'lat': '%.6f' % lat,
