@@ -44,6 +44,8 @@ def get_nearest(table_name, lat, lon, limit=20, offset=0, **kwargs):
         'offset': offset,
         'joins': join_sql,
     }
+    if 'custom_sql' in kwargs:
+        sql = sql + kwargs['custom_sql']
     result = cl.sql(sql)
 
     objects = result['rows']
@@ -59,7 +61,7 @@ def get_in_distance(
     """
     join_sql = _build_joins(table_name, **kwargs)
 
-    result = cl.sql(u"""
+    sql = u"""
                 SELECT %(tablename)s.cartodb_id,
                     ST_Distance(%(tablename)s.the_geom::geometry,
                         ST_SetSRID(ST_Point(%(lon)s,%(lat)s),
@@ -80,7 +82,11 @@ def get_in_distance(
         'limit': limit,
         'offset': offset,
         'joins': join_sql
-    })
+    }
+    if 'custom_sql' in kwargs:
+        sql = sql + kwargs['custom_sql']
+    result = cl.sql(sql)
+
     objects = result['rows']
     return objects
 
@@ -101,8 +107,8 @@ def _build_joins(table_name, **kwargs):
             table_join, field, pk = k.split('__')
             join_sql += """
                 JOIN %(tablejoin)s ON
-                    (%(field)s=%(value)s AND
-                    %(pk)s=%(tablename)s.cartodb_id)
+                    (%(tablejoin)s.%(field)s=%(value)s AND
+                    %(tablejoin)s.%(pk)s=%(tablename)s.cartodb_id)
                 """ % {
                         'tablename': table_name,
                         'tablejoin': table_join,
@@ -110,13 +116,23 @@ def _build_joins(table_name, **kwargs):
                         'pk': pk,
                         'value': v,
             }
+        if re.match('\w+__\w+', k):
+            table_join, field = k.split('__')
+            join_sql += """
+                JOIN %(tablejoin)s ON
+                    %(tablejoin)s.%(field)s=%(tablename)s.cartodb_id
+                """ % {
+                        'tablename': table_name,
+                        'tablejoin': table_join,
+                        'field': field,
+            }
     return join_sql
 
 
 def delete_row(table_name, pk):
     result = cl.sql(u"""
                 DELETE FROM %(tablename)s
-                WHERE cartodb_id=%(pk)s
+                WHERE cartodb_id=%(pk)s;
                 """ % {
         'tablename': table_name,
         'pk': pk,
@@ -127,7 +143,7 @@ def delete_row(table_name, pk):
 
 def delete_all(table_name):
     result = cl.sql(u"""
-                DELETE FROM %(tablename)s
+                DELETE FROM %(tablename)s;
                 """ % {
         'tablename': table_name})
 
