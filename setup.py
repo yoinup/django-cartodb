@@ -1,6 +1,6 @@
 # coding=utf-8
 
-from distutils.core import setup
+from setuptools import setup, find_packages
 
 setup(
     name='django-cartodb',
@@ -8,7 +8,19 @@ setup(
     install_requires=[
         'django>=1.4',
         'cartodb-python>=0.6'],
-    packages=['django_cartodb'],
+    url='https://github.com/yoinup/django-cartodb',
+    packages=find_packages(),
+    include_package_data=True,
+    license='BSD License',
+    classifiers=[
+        'Environment :: Web Environment',
+        'Framework :: Django',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: BSD License',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python',
+        'Topic :: Software Development :: Libraries :: Application Frameworks',
+    ],
     author='Javier Cordero',
     author_email='jcorderomartinez@gmail.com'
 )
