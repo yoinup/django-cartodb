@@ -1,0 +1,9 @@
+setup.py
+django_cartodb/__init__.py
+django_cartodb/models.py
+django_cartodb.egg-info/PKG-INFO
+django_cartodb.egg-info/SOURCES.txt
+django_cartodb.egg-info/dependency_links.txt
+django_cartodb.egg-info/requires.txt
+django_cartodb.egg-info/top_level.txt
+django_cartodb/lib/__init__.py
